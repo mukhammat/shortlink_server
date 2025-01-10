@@ -1,0 +1,33 @@
+services:
+    main:
+        container_name: main
+        build:
+            context: .
+            dockerfile: Dockerfile
+        env_file:
+            - .env
+        ports:
+            - "5001:5001"
+        command: npm run dev
+        depends_on:
+            - postgres
+        environment:
+            DB_HOST: postgres # Используем имя сервиса `postgres` для подключения
+            DB_PORT: 5432
+
+    postgres:
+        container_name: postgres
+        image: postgres:16
+        env_file:
+            - .env
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: nohamylove
+            POSTGRES_DB: backend_test_db
+        ports:
+            - "5433:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+
+volumes:
+    postgres_data:

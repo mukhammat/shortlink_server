@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>URL Shortener</title>
+    </head>
+    <body>
+        <h1>URL Shortener</h1>
+
+        <!-- Форма для ввода URL для сокращения -->
+        <form id="urlForm">
+            <label for="urlInput">Enter URL:</label>
+            <input
+                type="url"
+                id="urlInput"
+                required
+                placeholder="https://example.com"
+            />
+            <label for="aliasInput">Optional Alias:</label>
+            <input type="text" id="aliasInput" placeholder="custom-alias" />
+            <label for="expiresAtInput"
+                >Optional Expiry Date (ISO format):</label
+            >
+            <input type="datetime-local" id="expiresAtInput" />
+            <button type="submit">Shorten</button>
+        </form>
+
+        <hr />
+
+        <!-- Форма для получения информации о сокращенной ссылке -->
+        <form id="shortUrlForm">
+            <label for="shortUrlInput">Enter Short URL Alias:</label>
+            <input
+                type="text"
+                id="shortUrlInput"
+                required
+                placeholder="shortUrl"
+            />
+            <button type="submit">Get Info</button>
+        </form>
+
+        <!-- Форма для удаления сокращенной ссылки -->
+        <form id="deleteUrlForm">
+            <label for="deleteUrlInput">Enter Short URL Alias to Delete:</label>
+            <input
+                type="text"
+                id="deleteUrlInput"
+                required
+                placeholder="shortUrl"
+            />
+            <button type="submit">Delete</button>
+        </form>
+
+        <hr />
+
+        <!-- Форма для получения аналитики по сокращенной ссылке -->
+        <form id="analyticsForm">
+            <label for="analyticsInput"
+                >Enter Short URL Alias for Analytics:</label
+            >
+            <input
+                type="text"
+                id="analyticsInput"
+                required
+                placeholder="shortUrl"
+            />
+            <button type="submit">Get Analytics</button>
+        </form>
+
+        <!-- Место для отображения результата -->
+        <div id="result"></div>
+
+        <script>
+            const host = "http://localhost:5001"; // Укажите ваш хост
+
+            // Функция для создания сокращенной ссылки
+            async function createLink(link, alias, expiresAt) {
+                // Проверка, что ссылка обязательна
+                if (!link) {
+                    document.getElementById(
+                        "result"
+                    ).innerHTML = `<p style="color: red;">Ошибка: оригинальная ссылка обязательна</p>`;
+                    return;
+                }
+
+                try {
+                    // Отправляем запрос на создание ссылки
+                    const requestBody = { originalUrl: link };
+
+                    // Добавляем поля только если они не равны null или undefined
+                    if (alias) {
+                        requestBody.alias = alias;
+                    }
+                    if (expiresAt) {
+                        requestBody.expiresAt = expiresAt;
+                    }
+
+                    const response = await fetch(`${host}/shorten`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(requestBody), // отправляем только поля, которые не null
+                    });
+
+                    // Проверка на успешный ответ
+                    if (!response.ok) {
+                        throw new Error(`Ошибка: ${response.statusText}`);
+                    }
+
+                    // Получаем результат
+                    const result = await response.json();
+                    if (result.error) {
+                        throw new Error(result.error);
+                    }
+
+                    // Выводим ссылку
+                    document.getElementById(
+                        "result"
+                    ).innerHTML = `<p>Сокращенная ссылка: <a href="${result.link}" target="_blank">${result.link}</a></p>`;
+                } catch (error) {
+                    document.getElementById(
+                        "result"
+                    ).innerHTML = `<p style="color: red;">Ошибка: ${error.message}</p>`;
+                }
+            }
+
+            // Функция для получения информации о сокращенной ссылке
+            async function getLinkInfo(shortUrl) {
+                try {
+                    const response = await fetch(`${host}/info/${shortUrl}`);
+                    if (!response.ok) {
+                        throw new Error(`Ошибка: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    document.getElementById("result").innerHTML = `
+                        <p>Оригинальная ссылка: <a href="${
+                            result.originalUrl
+                        }" target="_blank">${result.originalUrl}</a></p>
+                        <p>Дата создания: ${new Date(
+                            result.createdAt
+                        ).toLocaleString()}</p>
+                        <p>Количество переходов: ${result.clickCount}</p>
+                    `;
+                } catch (error) {
+                    document.getElementById(
+                        "result"
+                    ).innerHTML = `<p style="color: red;">Ошибка: ${error.message}</p>`;
+                }
+            }
+
+            // Функция для удаления сокращенной ссылки
+            async function deleteLink(shortUrl) {
+                try {
+                    const response = await fetch(`${host}/delete/${shortUrl}`, {
+                        method: "DELETE",
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Ошибка: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    document.getElementById(
+                        "result"
+                    ).innerHTML = `<p>${result.message}</p>`;
+                } catch (error) {
+                    document.getElementById(
+                        "result"
+                    ).innerHTML = `<p style="color: red;">Ошибка: ${error.message}</p>`;
+                }
+            }
+
+            // Функция для получения аналитики по сокращенной ссылке
+            async function getAnalytics(shortUrl) {
+                try {
+                    const response = await fetch(
+                        `${host}/analytics/${shortUrl}`
+                    );
+                    if (!response.ok) {
+                        throw new Error(`Ошибка: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    let analytics = `<p>Количество кликов: ${result.clicks}</p><p>Уникальные IP-адреса:</p><ul>`;
+                    result.uniqueIps.forEach((ipData) => {
+                        analytics += `<li>IP: ${
+                            ipData.ip
+                        }, Последний визит: ${new Date(
+                            ipData.lastSeen
+                        ).toLocaleString()}</li>`;
+                    });
+                    analytics += `</ul>`;
+                    document.getElementById("result").innerHTML = analytics;
+                } catch (error) {
+                    document.getElementById(
+                        "result"
+                    ).innerHTML = `<p style="color: red;">Ошибка: ${error.message}</p>`;
+                }
+            }
+
+            // Обработчик для формы создания ссылки
+            document
+                .getElementById("urlForm")
+                .addEventListener("submit", (event) => {
+                    event.preventDefault();
+                    const url = document.getElementById("urlInput").value;
+                    const alias =
+                        document.getElementById("aliasInput").value || null;
+                    const expiresAt =
+                        document.getElementById("expiresAtInput").value || null;
+                    createLink(url, alias, expiresAt);
+                });
+
+            // Обработчик для формы получения информации о ссылке
+            document
+                .getElementById("shortUrlForm")
+                .addEventListener("submit", (event) => {
+                    event.preventDefault();
+                    const shortUrl =
+                        document.getElementById("shortUrlInput").value;
+                    getLinkInfo(shortUrl);
+                });
+
+            // Обработчик для формы удаления ссылки
+            document
+                .getElementById("deleteUrlForm")
+                .addEventListener("submit", (event) => {
+                    event.preventDefault();
+                    const shortUrl =
+                        document.getElementById("deleteUrlInput").value;
+                    deleteLink(shortUrl);
+                });
+
+            // Обработчик для формы получения аналитики
+            document
+                .getElementById("analyticsForm")
+                .addEventListener("submit", (event) => {
+                    event.preventDefault();
+                    const shortUrl =
+                        document.getElementById("analyticsInput").value;
+                    getAnalytics(shortUrl);
+                });
+        </script>
+    </body>
+</html>
